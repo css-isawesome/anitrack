@@ -8,8 +8,8 @@ class ApiService {
   static const String baseUrl = "https://api.jikan.moe/v4";
 
   // pobieranie top anime do wyswietlenia na stronie glownej
-  static Future<List<TopAnime>> fetchTopAnime() async {
-    final response = await http.get(Uri.parse("$baseUrl/top/anime?sfw"));
+  static Future<List<TopAnime>> fetchTopAnime({int page = 1}) async { // jedna strona zwraca 25 elementow
+    final response = await http.get(Uri.parse("$baseUrl/top/anime?sfw&page=$page")); // paginacja
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       final List animes = data["data"];
@@ -47,6 +47,7 @@ class ApiService {
           engTitle: anime["title_english"] ?? anime["title"] ?? "No Title",
           img: anime["images"]["jpg"]["image_url"],
           jpTitle: anime["title_japanese"] ?? "No Title",
+          synopsis: anime["synopsis"] ?? "No Synopsis",
           status: anime["status"] ?? "Unknown",
           aired: anime["aired"]["string"] ?? "Unknown",
           demographic: demoString.isEmpty ? "None" : demoString,

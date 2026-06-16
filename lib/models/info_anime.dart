@@ -5,6 +5,7 @@ class InfoAnime {
   final String img;
   final String engTitle;
   final String jpTitle;
+  final String synopsis;
   final String status;
   final String aired;
   final String demographic;
@@ -20,6 +21,7 @@ class InfoAnime {
     required this.img, // okladka anime
     required this.engTitle, // ang tytul anime
     required this.jpTitle,
+    required this.synopsis,
     required this.status,
     required this.aired,
     required this.demographic,
@@ -36,6 +38,7 @@ class InfoAnime {
       "img": img,
       "engTitle": engTitle,
       "jpTitle": jpTitle,
+      "synopsis": synopsis,
       "status": status,
       "aired": aired,
       "demographic": demographic,
@@ -53,6 +56,7 @@ class InfoAnime {
       img: map["img"],
       engTitle: map["engTitle"],
       jpTitle: map["jpTitle"],
+      synopsis: map["synopsis"],
       status: map["status"],
       aired: map["aired"],
       demographic: map["demographic"],
