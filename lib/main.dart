@@ -161,10 +161,10 @@ class _MainAnimeListScreenState extends State<MainAnimeListScreen> {
                           borderRadius: BorderRadius.circular(8.0),
                           // zaokraglone rogi okladki
                           child: Image.network(
-                            anime.img,
-                            fit: BoxFit.cover,
                             // wypelnienie calego grida przez okladke
                             width: double.infinity,
+                            anime.img,
+                            fit: BoxFit.cover,
                           ),
                         ),
                       ),
@@ -288,6 +288,7 @@ class _InfoAnimeScreenState extends State<InfoAnimeScreen> {
                       child: Image.network(
                         anime.img,
                         fit: BoxFit.cover, // uciecie gory i dolu
+                        alignment: Alignment.topCenter,
                       ),
                     ),
                   ),
@@ -299,36 +300,49 @@ class _InfoAnimeScreenState extends State<InfoAnimeScreen> {
                     vertical: 8.0,
                   ),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    // tytuly
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          // tytul angielski
-                          Text(
-                            anime.engTitle,
-                            style: const TextStyle(
-                              fontSize: 22.0,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.grey,
-                            ),
-                          ),
-                          const SizedBox(height: 4.0),
+                      // tytul angielski
+                      Text(
+                        anime.engTitle,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 22.0,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey,
+                        ),
+                      ),
+                      const SizedBox(height: 4.0),
 
-                          // tytul japonski
-                          Text(
-                            anime.jpTitle,
-                            style: TextStyle(
-                              fontSize: 14.0,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.grey,
-                            ),
-                          ),
-                        ],
-
+                      // tytul japonski
+                      Text(
+                        anime.jpTitle,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 14.0,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.grey,
+                        ),
                       ),
 
-                      // dodatkowe informacje
+                      const SizedBox(height: 32.0),
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          // Kod po kliknięciu
+                        },
+                        icon: const Icon(Icons.bookmark_outline),
+                        label: const Text("Track Anime"),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.deepPurple,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8.0),
+                          ),
+                        ),
+                      ),
+
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -343,6 +357,26 @@ class _InfoAnimeScreenState extends State<InfoAnimeScreen> {
                           const Divider(height: 32.0),
                           // linia do oddzielenia ekranu
                           Text(anime.synopsis),
+
+                          const SizedBox(height: 32.0),
+                          Text(
+                            "Information",
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const Divider(height: 32.0),
+                          _buildAnimeDetail(
+                            "Episodes",
+                            anime.episodes.toString(),
+                          ),
+                          _buildAnimeDetail("Status", anime.status),
+                          _buildAnimeDetail("Aired", anime.aired),
+                          _buildAnimeDetail("Demographic", anime.demographic),
+                          _buildAnimeDetail("Genre", anime.genre),
+                          _buildAnimeDetail("Score", anime.score.toString()),
+                          _buildAnimeDetail("Studios", anime.studios),
                         ],
                       ),
                     ],
@@ -352,6 +386,32 @@ class _InfoAnimeScreenState extends State<InfoAnimeScreen> {
             ),
           );
         },
+      ),
+    );
+  }
+
+  // do wyswietlania informacji
+  Widget _buildAnimeDetail(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8.0),
+      // Automatyczny mały odstęp pod każdym wierszem
+      child: Text.rich(
+        TextSpan(
+          // style: const TextStyle(),
+          children: [
+            TextSpan(
+              text: "$label: ",
+              style: const TextStyle(
+                fontWeight: FontWeight.w500,
+                color: Colors.grey, // Kolor dla etykiety
+              ),
+            ),
+            TextSpan(
+              text: value,
+              style: const TextStyle(color: Colors.white),
+            ),
+          ],
+        ),
       ),
     );
   }
