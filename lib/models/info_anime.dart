@@ -6,7 +6,7 @@ class InfoAnime {
   final String engTitle;
   final String jpTitle;
   final String synopsis;
-  var episodes;
+  final String episodes; // double --> string
   final String status;
   final String aired;
   final String demographic;
@@ -14,7 +14,10 @@ class InfoAnime {
   final double score;
   final String studios;
   int progress;
+  String? personalStatus;
   double? personalScore;
+  bool favorite;
+
 
   // konstruktor
   InfoAnime({
@@ -31,7 +34,9 @@ class InfoAnime {
     required this.score,
     required this.studios,
     this.progress = 0,
+    this.personalStatus,
     this.personalScore,
+    this.favorite = false,
   });
 
   Map<String, dynamic> toMap() {
@@ -49,7 +54,9 @@ class InfoAnime {
       "score": score,
       "studios": studios,
       "progress": progress,
+      "personalStatus": personalStatus,
       "personalScore": personalScore,
+      "favorite": favorite,
     };
   }
 
@@ -68,7 +75,9 @@ class InfoAnime {
       score: map["score"],
       studios: map["studios"],
       progress: map["progress"],
+      personalStatus: map["personalStatus"],
       personalScore: map["personalScore"],
+      favorite: map["favorite"],
     );
   }
 }

@@ -3,12 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:hive_ce_flutter/hive_flutter.dart';
 import '/models/top_anime.dart';
 import '/models/info_anime.dart';
+import 'services/database_anime.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Hive.initFlutter();
-  await Hive.openBox<TopAnime>("topAnimeBox");
-  await Hive.openBox<InfoAnime>("userAnimeBox");
+  await Hive.openBox<Map>("userAnimeBox");
 
   runApp(const MyApp());
 }
@@ -37,7 +37,7 @@ class MainAnimeListScreen extends StatefulWidget {
 class _MainAnimeListScreenState extends State<MainAnimeListScreen> {
   final ScrollController _scrollController = ScrollController();
 
-  List<TopAnime> _animeList = []; // pobrane anime
+  final List<TopAnime> _animeList = []; // pobrane anime
   int _currentPage = 1; // sledzenie aktualnej strony
   bool _isLoading = false; // czy trwa pobieranie anime
 
@@ -45,11 +45,13 @@ class _MainAnimeListScreenState extends State<MainAnimeListScreen> {
   void initState() {
     super.initState();
     _loadMoreAnime();
+    // _loadCachedAnime();
 
     // scrollowanie
     _scrollController.addListener(() {
       // jesli uzytkownik przewinal do 90% dlugosci ekranu i nie trwa ladowanie
-      if (_scrollController.position.pixels >=
+      if (_animeList.isNotEmpty &&
+          _scrollController.position.pixels >=
               _scrollController.position.maxScrollExtent * 0.9 &&
           !_isLoading) {
         _loadMoreAnime();
@@ -75,14 +77,21 @@ class _MainAnimeListScreenState extends State<MainAnimeListScreen> {
         _currentPage++; // zwiekszenie licznika
       });
     } catch (e) {
+      if (!mounted) return; // sprawdzenie czy ekran wciaz istnieje bo warning
+      String errorMessage = "Error: $e";
       // na wypadek errora - snackbar z komunikatem o bledze
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Nie udało się pobrać danych: $e")),
-      );
+      if (_animeList.isNotEmpty) {
+        errorMessage = "Working offline. Could not load more anime.";
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(errorMessage)));
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -90,7 +99,6 @@ class _MainAnimeListScreenState extends State<MainAnimeListScreen> {
   void dispose() {
     _scrollController
         .dispose(); // czyszczenie kontrolera na wypadek nisczenia ekranu zeby nie doszlo do wycieku pamieci
-
     super.dispose();
   }
 
@@ -201,6 +209,21 @@ class UserProfile extends StatefulWidget {
 }
 
 class _UserProfileState extends State<UserProfile> {
+  List<InfoAnime> _favoritedAnimeList = [];
+
+  @override
+  void initState() {
+    super.initState();
+    // Pobieramy listę wszystkich zapisanych w Hive obiektów InfoAnime
+    _loadFavorites();
+  }
+
+  void _loadFavorites() {
+    setState(() {
+      _favoritedAnimeList = AnimeLocalDatabase.getTrackedAnime();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -210,7 +233,59 @@ class _UserProfileState extends State<UserProfile> {
         backgroundColor: Colors.black45,
         foregroundColor: Colors.grey,
       ),
-      body: const Center(child: Text("Tutaj będą statystyki, postęp i oceny.")),
+      // Jeśli lista jest pusta, wyświetlamy komunikat, w innym wypadku listę tytułów
+      body: _favoritedAnimeList.isEmpty
+          ? const Center(
+              child: Text(
+                "Nothing to see here yet...",
+                style: TextStyle(color: Colors.grey, fontSize: 16.0),
+              ),
+            )
+          : ListView.builder(
+              padding: const EdgeInsets.all(16.0),
+              itemCount: _favoritedAnimeList.length,
+              itemBuilder: (context, index) {
+                final anime = _favoritedAnimeList[index];
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(
+                          Icons.favorite,
+                          color: Colors.redAccent,
+                        ),
+                        onPressed: () async {
+                          await AnimeLocalDatabase.deleteAnime(anime.id);
+
+                          if (!mounted) return;
+                          _loadFavorites();
+                        },
+                      ),
+                      const SizedBox(width: 12.0),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () async {
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => InfoAnimeScreen(
+                                  animeId: anime.id,
+                                  animeTitle: anime.engTitle,
+                                ),
+                              ),
+                            );
+                            if (!mounted) return;
+                            _loadFavorites(); // Odświeżamy listę z bazy Hive
+                          },
+                          child: Text(anime.engTitle),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
     );
   }
 }
@@ -231,12 +306,19 @@ class InfoAnimeScreen extends StatefulWidget {
 
 class _InfoAnimeScreenState extends State<InfoAnimeScreen> {
   late Future<InfoAnime> _animeInfoFuture;
+  bool _isFavorited = false;
 
   @override
   void initState() {
     super.initState();
     // pobranie szczegolowych informacji o anime
     _animeInfoFuture = ApiService.fetchInfoAnime(widget.animeId);
+
+    // Sprawdzamy, czy to anime już istnieje w naszej bazie Hive
+    final cachedAnime = AnimeLocalDatabase.getAnimeById(widget.animeId);
+    if (cachedAnime != null) {
+      _isFavorited = true;
+    }
   }
 
   @override
@@ -260,13 +342,13 @@ class _InfoAnimeScreenState extends State<InfoAnimeScreen> {
           if (snapshot.hasError) {
             return Center(
               child: Text(
-                "Coś poszło nie tak: ${snapshot.error}",
+                "Something went wrong...: ${snapshot.error}",
                 style: const TextStyle(color: Colors.redAccent),
               ),
             );
           }
 
-          // jesli suckes
+          // jesli sukces
           final anime = snapshot.data!;
 
           return SingleChildScrollView(
@@ -288,7 +370,7 @@ class _InfoAnimeScreenState extends State<InfoAnimeScreen> {
                       child: Image.network(
                         anime.img,
                         fit: BoxFit.cover, // uciecie gory i dolu
-                        alignment: Alignment.topCenter,
+                        // alignment: Alignment.topCenter,
                       ),
                     ),
                   ),
@@ -328,17 +410,33 @@ class _InfoAnimeScreenState extends State<InfoAnimeScreen> {
 
                       const SizedBox(height: 32.0),
                       ElevatedButton.icon(
-                        onPressed: () {
-                          // Kod po kliknięciu
+                        onPressed: () async {
+                          if (_isFavorited) {
+                            // Jeśli już był polubiony -> usuwamy z bazy Hive
+                            await AnimeLocalDatabase.deleteAnime(anime.id);
+                          } else {
+                            // Jeśli nie był polubiony -> zapisujemy do bazy Hive
+                            await AnimeLocalDatabase.saveAnime(anime);
+                          }
+                          setState(() {
+                            _isFavorited = !_isFavorited;
+                            // print(_isFavorited); // debug
+                          });
                         },
-                        icon: const Icon(Icons.bookmark_outline),
-                        label: const Text("Track Anime"),
+                        // wyglad przycisku favorite
+                        icon: Icon(
+                          _isFavorited ? Icons.favorite : Icons.favorite_border,
+                        ),
+                        label: Text(_isFavorited ? "Favorited" : "Favorite"),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.deepPurple,
+                          backgroundColor: Colors.redAccent,
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16.0,
+                            vertical: 12.0,
+                          ),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8.0),
+                            borderRadius: BorderRadius.circular(20.0),
                           ),
                         ),
                       ),
@@ -377,6 +475,7 @@ class _InfoAnimeScreenState extends State<InfoAnimeScreen> {
                           _buildAnimeDetail("Genre", anime.genre),
                           _buildAnimeDetail("Score", anime.score.toString()),
                           _buildAnimeDetail("Studios", anime.studios),
+                          const SizedBox(height: 32.0),
                         ],
                       ),
                     ],
@@ -390,7 +489,7 @@ class _InfoAnimeScreenState extends State<InfoAnimeScreen> {
     );
   }
 
-  // do wyswietlania informacji
+  // do wyswietlania informacji jedna za druga pod soba np episodes gernre itd
   Widget _buildAnimeDetail(String label, String value) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8.0),

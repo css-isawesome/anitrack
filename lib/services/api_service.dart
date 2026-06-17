@@ -48,7 +48,7 @@ class ApiService {
           img: anime["images"]["jpg"]["large_image_url"] ?? anime["images"]["jpg"]["image_url"],
           jpTitle: anime["title_japanese"] ?? "No Title",
           synopsis: anime["synopsis"] ?? "No Synopsis",
-          episodes: anime["episodes"] ?? "Unknown",
+          episodes: anime["episodes"] != null ? anime["episodes"].toString() : "?",
           status: anime["status"] ?? "Unknown",
           aired: anime["aired"]["string"] ?? "Unknown",
           demographic: demoString.isEmpty ? "None" : demoString,
