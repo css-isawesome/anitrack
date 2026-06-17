@@ -29,4 +29,8 @@ class AnimeLocalDatabase {
   static bool isEmpty() {
     return _box.isEmpty;
   }
+
+  static Future<void> clearDatabase() async {
+    await _box.clear();
+  }
 }

@@ -4,11 +4,25 @@ import 'package:hive_ce_flutter/hive_flutter.dart';
 import '/models/top_anime.dart';
 import '/models/info_anime.dart';
 import 'services/database_anime.dart';
+import "package:firebase_core/firebase_core.dart";
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
+import 'dart:ui';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
   await Hive.initFlutter();
   await Hive.openBox<Map>("userAnimeBox");
+
+  FlutterError.onError = (errorDetails) {
+    FirebaseCrashlytics.instance.recordFlutterFatalError(errorDetails);
+  };
+
+  PlatformDispatcher.instance.onError = (error, stack) {
+    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+    return true;
+  };
 
   runApp(const MyApp());
 }
@@ -80,9 +94,6 @@ class _MainAnimeListScreenState extends State<MainAnimeListScreen> {
       if (!mounted) return; // sprawdzenie czy ekran wciaz istnieje bo warning
       String errorMessage = "Error: $e";
       // na wypadek errora - snackbar z komunikatem o bledze
-      if (_animeList.isNotEmpty) {
-        errorMessage = "Working offline. Could not load more anime.";
-      }
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(errorMessage)));
@@ -113,6 +124,16 @@ class _MainAnimeListScreenState extends State<MainAnimeListScreen> {
         foregroundColor: Colors.grey,
         actions: [
           IconButton(
+            icon: const Icon(Icons.settings, color: Colors.grey),
+            onPressed: () {
+              // przejscie do ekranu z profilem uzytkownika
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SettingsScreen()),
+              );
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.favorite_border, color: Colors.redAccent),
             onPressed: () {
               // przejscie do ekranu z profilem uzytkownika
@@ -127,75 +148,84 @@ class _MainAnimeListScreenState extends State<MainAnimeListScreen> {
       // jesli lista jest pusta i ladujemy - kolko ladowania, inaczej pokazuje anime
       body: _animeList.isEmpty && _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : GridView.builder(
-              controller: _scrollController,
-              // kontroler przewijania
-              padding: const EdgeInsets.all(12.0),
-              itemCount: _animeList.length + (_isLoading ? 1 : 0),
-              //
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2, // 2 kolumny
-                crossAxisSpacing: 12.0, // odstep poziomy miedzy kolumnami
-                mainAxisSpacing: 16.0, // odstep pionowy miedzy wierszami
-                childAspectRatio:
-                    0.65, // stosunek szerokosci do wysokosci okladki zeby sie zmiescilo
-              ),
-              itemBuilder: (context, index) {
-                // jesli ostatni element - pokaz kolko
-                if (index == _animeList.length) {
-                  return const Center(child: CircularProgressIndicator());
-                }
+          : RefreshIndicator(
+              onRefresh: () async {
+                setState(() {
+                  _currentPage = 1;
+                  _animeList.clear();
+                });
+                await _loadMoreAnime();
+              },
+              child: GridView.builder(
+                controller: _scrollController,
+                // kontroler przewijania
+                padding: const EdgeInsets.all(12.0),
+                itemCount: _animeList.length + (_isLoading ? 1 : 0),
+                //
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2, // 2 kolumny
+                  crossAxisSpacing: 12.0, // odstep poziomy miedzy kolumnami
+                  mainAxisSpacing: 16.0, // odstep pionowy miedzy wierszami
+                  childAspectRatio:
+                      0.65, // stosunek szerokosci do wysokosci okladki zeby sie zmiescilo
+                ),
+                itemBuilder: (context, index) {
+                  // jesli ostatni element - pokaz kolko
+                  if (index == _animeList.length) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
 
-                final anime = _animeList[index];
-                // klikniecie w szczegoly anime
-                return GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => InfoAnimeScreen(
-                          animeId: anime.id,
-                          animeTitle: anime.engTitle,
-                        ),
-                      ),
-                    );
-                  },
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // okladka anime
-                      Expanded(
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(8.0),
-                          // zaokraglone rogi okladki
-                          child: Image.network(
-                            // wypelnienie calego grida przez okladke
-                            width: double.infinity,
-                            anime.img,
-                            fit: BoxFit.cover,
+                  final anime = _animeList[index];
+                  // klikniecie w szczegoly anime
+                  return GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => InfoAnimeScreen(
+                            animeId: anime.id,
+                            animeTitle: anime.engTitle,
                           ),
                         ),
-                      ),
-                      const SizedBox(
-                        height: 8.0, // odstep miedzy zdjeciem a tekstem
-                      ),
-                      // tytul pod spodem
-                      Text(
-                        anime.engTitle,
-                        maxLines: 2,
-                        // max 2 linijki tekstu
-                        overflow: TextOverflow.ellipsis,
-                        // jesli tytul za dlugi to doda kropki
-                        style: const TextStyle(
-                          color: Colors.grey,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14.0,
+                      );
+                    },
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // okladka anime
+                        Expanded(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8.0),
+                            // zaokraglone rogi okladki
+                            child: Image.network(
+                              // wypelnienie calego grida przez okladke
+                              width: double.infinity,
+                              anime.img,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                );
-              },
+                        const SizedBox(
+                          height: 8.0, // odstep miedzy zdjeciem a tekstem
+                        ),
+                        // tytul pod spodem
+                        Text(
+                          anime.engTitle,
+                          maxLines: 2,
+                          // max 2 linijki tekstu
+                          overflow: TextOverflow.ellipsis,
+                          // jesli tytul za dlugi to doda kropki
+                          style: const TextStyle(
+                            color: Colors.grey,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14.0,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
             ),
     );
   }
@@ -319,6 +349,15 @@ class _InfoAnimeScreenState extends State<InfoAnimeScreen> {
     if (cachedAnime != null) {
       _isFavorited = true;
     }
+
+    // logowanie wyswietlenia szczegolow anime
+    FirebaseAnalytics.instance.logEvent(
+      name: 'anime_viewed',
+      parameters: {
+        'anime_id': widget.animeId,
+        'anime_title': widget.animeTitle,
+      },
+    );
   }
 
   @override
@@ -414,9 +453,26 @@ class _InfoAnimeScreenState extends State<InfoAnimeScreen> {
                           if (_isFavorited) {
                             // Jeśli już był polubiony -> usuwamy z bazy Hive
                             await AnimeLocalDatabase.deleteAnime(anime.id);
+
+                            // logowanie usuniecia z listy ulubionych
+                            await FirebaseAnalytics.instance.logEvent(
+                              name: 'anime_unfavorited',
+                              parameters: {
+                                'anime_id': anime.id,
+                                'anime_title': anime.engTitle,
+                              },
+                            );
                           } else {
                             // Jeśli nie był polubiony -> zapisujemy do bazy Hive
                             await AnimeLocalDatabase.saveAnime(anime);
+
+                            await FirebaseAnalytics.instance.logEvent(
+                              name: 'anime_favorited',
+                              parameters: {
+                                'anime_id': anime.id,
+                                'anime_title': anime.engTitle,
+                              },
+                            );
                           }
                           setState(() {
                             _isFavorited = !_isFavorited;
@@ -511,6 +567,80 @@ class _InfoAnimeScreenState extends State<InfoAnimeScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class SettingsScreen extends StatelessWidget {
+  const SettingsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white10,
+      appBar: AppBar(
+        title: const Text("Settings"),
+        backgroundColor: Colors.black45,
+        foregroundColor: Colors.grey,
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16.0),
+        children: [
+          // przycisk czyszczenia cache
+          ListTile(
+            leading: const Icon(Icons.delete_sweep, color: Colors.redAccent),
+            title: const Text(
+              "Clear Cache / Favorites",
+              style: TextStyle(
+                color: Colors.redAccent,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            subtitle: const Text(
+              "This will delete all saved anime from your device.",
+              style: TextStyle(color: Colors.grey),
+            ),
+            onTap: () {
+              // Pokazujemy okienko dialogowe z potwierdzeniem
+              showDialog(
+                context: context,
+                builder: (BuildContext dialogContext) {
+                  return AlertDialog(
+                    title: const Text("Are you sure?"),
+                    content: const Text(
+                      "Do you really want to clear all favorited anime?",
+                    ),
+                    actions: [
+                      TextButton(
+                        child: const Text("Cancel"),
+                        onPressed: () => Navigator.pop(dialogContext),
+                      ),
+                      TextButton(
+                        child: const Text(
+                          "Clear",
+                          style: TextStyle(color: Colors.redAccent),
+                        ),
+                        onPressed: () async {
+                          await AnimeLocalDatabase.clearDatabase();
+
+                          if (!context.mounted) return;
+                          Navigator.pop(dialogContext); // Zamknij dialog
+
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text("Cache cleared successfully!"),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  );
+                },
+              );
+            },
+          ),
+        ],
       ),
     );
   }

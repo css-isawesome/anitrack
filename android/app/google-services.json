@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "191456370420",
+    "project_id": "anitrack-afa3b",
+    "storage_bucket": "anitrack-afa3b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:191456370420:android:f479b53851333cb15e88a1",
+        "android_client_info": {
+          "package_name": "com.example.anitrack"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAt-l5Z1J3TTW03-6eCytSVVZ95GO6wEso"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
